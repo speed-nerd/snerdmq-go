@@ -141,6 +141,8 @@ If the HTTP endpoint returns a non-200 status code, it triggers a retry. If it p
 
 When a task fails repeatedly and exhausts its `maxRetries`, the SnerdMQ daemon permanently moves it to the Dead Letter Queue. You can hook into this event to alert your team, update your database, or send a Slack message by registering a Max Retry Handler.
 
+> **Delivery semantics:** SnerdMQ provides **at-least-once** delivery. In rare cases — e.g. if the daemon is killed while a task is executing — a task may be executed again after restart. Make your handlers idempotent.
+
 ```go
 // 5. Catch tasks that have permanently failed (Dead Letter Queue)
 queue.RegisterMaxRetryHandler("send_email", func(ctx context.Context, data map[string]interface{}) error {
