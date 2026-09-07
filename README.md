@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>🚀 SnerdMQ Go SDK (v1.0.7)</h1>
+  <h1>🚀 SnerdMQ Go SDK (v1.0.8)</h1>
   <p>A zero-config, persistent background job queue for Go microservices. The official Go client for the SnerdMQ Rust daemon.</p>
 
   [![Go Reference](https://pkg.go.dev/badge/github.com/speed-nerd/snerdmq-go.svg)](https://pkg.go.dev/github.com/speed-nerd/snerdmq-go)
@@ -41,6 +41,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/speed-nerd/snerdmq-go"
 )
@@ -108,12 +111,17 @@ func main() {
 		&maxExecutionSeconds,
 	)
 
-	// Keep main thread alive
-	queue.Wait()
+	// 6. Wait for OS signals and shut down gracefully
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	
+	<-sigs
+	fmt.Println("Shutting down SnerdMQ...")
+	queue.Shutdown()
 }
 ```
 
-### ⚙️ Advanced Task Configuration (v1.0.7)
+### ⚙️ Advanced Task Configuration (v1.0.8)
 To power complex workflows, tasks can now be configured with advanced orchestration parameters via the `Enqueue` positional arguments:
 
 * **`AutoDedupe` (`bool`)**: If set to `true`, the daemon computes a cryptographic hash of the task type and data. If an identical payload is pending execution, this new task is silently dropped.

@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"sync"
 	"syscall"
@@ -73,14 +72,6 @@ func NewSnerdQueue(config ...SnerdQueueConfig) (*SnerdQueue, error) {
 		pendingAcks:      make(map[string]chan error),
 		done:             make(chan struct{}),
 	}
-
-	// Handle graceful shutdown on interrupt signals
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-sigs
-		queue.Shutdown()
-	}()
 
 	return queue, nil
 }

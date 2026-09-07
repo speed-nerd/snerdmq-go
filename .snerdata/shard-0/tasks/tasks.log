@@ -1,3 +1,4 @@
 {"taskId":"go-job-1","retryCount":0,"maxRetries":3,"retryAfterHours":0.0,"retryAfterTime":"2026-08-12T12:45:18.601869Z","taskData":"{\"message\":\"Baba Yaga\",\"user_id\":\"john_wick\"}","taskType":"test_go_notification"}
 {"taskId":"go-job-1","retryCount":0,"maxRetries":3,"retryAfterHours":0.0,"retryAfterTime":"2026-08-14T16:52:49.042598Z","taskData":"{\"message\":\"Baba Yaga\",\"user_id\":\"john_wick\"}","taskType":"test_go_notification"}
 {"taskId":"go-job-1","retryCount":0,"maxRetries":3,"retryAfterHours":0.0,"retryAfterTime":"2026-08-19T23:55:57.909326Z","taskData":"{\"message\":\"Baba Yaga\",\"user_id\":\"john_wick\"}","taskType":"test_go_notification","executeAt":"2026-08-19T23:55:57.909326Z"}
+{"taskId":"go-job-1","retryCount":0,"maxRetries":3,"retryAfterHours":0.0,"retryAfterTime":"2026-09-07T16:26:42.927618Z","taskData":"{\"message\":\"Baba Yaga\",\"user_id\":\"john_wick\"}","taskType":"test_go_notification","executeAt":"2026-09-07T16:26:42.927618Z"}
