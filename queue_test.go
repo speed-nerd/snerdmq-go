@@ -74,6 +74,7 @@ func TestSnerdQueueIntegration(t *testing.T) {
 		nil,
 		nil,
 		nil,
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("Failed to enqueue: %v", err)

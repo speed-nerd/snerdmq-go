@@ -327,7 +327,7 @@ func (q *SnerdQueue) send(msg map[string]interface{}) {
 	q.stdin.Write(b) //nolint:errcheck // ignore write errors when daemon dies
 }
 
-func (q *SnerdQueue) Enqueue(taskID, taskType string, data interface{}, maxRetries int, retryAfterHours float64, rateLimitGroup string, maxPerMinute int, autoDedupe *bool, urgencyScore *float64, executeAt *string, cron *string, webhookUrl *string, maxExecutionSeconds *int) error {
+func (q *SnerdQueue) Enqueue(taskID, taskType string, data interface{}, maxRetries int, retryAfterHours float64, rateLimitGroup string, maxPerMinute int, autoDedupe *bool, urgencyScore *float64, executeAt *string, cron *string, webhookUrl *string, maxExecutionSeconds *int, triggerAfterIds []string) error {
 	q.shutdownMutex.RLock()
 	if q.process == nil || q.shuttingDown {
 		q.shutdownMutex.RUnlock()
@@ -376,6 +376,9 @@ func (q *SnerdQueue) Enqueue(taskID, taskType string, data interface{}, maxRetri
 	}
 	if maxExecutionSeconds != nil {
 		payload["max_execution_seconds"] = *maxExecutionSeconds
+	}
+	if triggerAfterIds != nil {
+		payload["trigger_after_ids"] = triggerAfterIds
 	}
 
 	ch := make(chan error, 1)
