@@ -33,18 +33,25 @@ type SnerdQueue struct {
 	engineAlive      bool
 	shutdownMutex    sync.RWMutex
 	done             chan struct{}
+	maxLocalShards   int
+	maxWorkers       int
 }
 
 type SnerdQueueConfig struct {
-	BinaryPath  string
-	StoragePath string
+	BinaryPath     string
+	StoragePath    string
+	MaxLocalShards int
+	MaxWorkers     int
 }
 
 func NewSnerdQueue(config ...SnerdQueueConfig) (*SnerdQueue, error) {
 	var binPath, storePath string
+	var maxLocalShards, maxWorkers int
 	if len(config) > 0 {
 		binPath = config[0].BinaryPath
 		storePath = config[0].StoragePath
+		maxLocalShards = config[0].MaxLocalShards
+		maxWorkers = config[0].MaxWorkers
 	}
 
 	if binPath == "" {
@@ -66,6 +73,8 @@ func NewSnerdQueue(config ...SnerdQueueConfig) (*SnerdQueue, error) {
 	queue := &SnerdQueue{
 		binaryPath:       binPath,
 		storagePath:      storePath,
+		maxLocalShards:   maxLocalShards,
+		maxWorkers:       maxWorkers,
 		handlers:         make(map[string]func(context.Context, map[string]interface{}) error),
 		maxRetryHandlers: make(map[string]func(context.Context, map[string]interface{}) error),
 		wsClients:        make(map[*websocket.Conn]bool),
@@ -110,6 +119,15 @@ func (q *SnerdQueue) StartListening() error {
 	}
 
 	q.process = exec.Command(q.binaryPath, args...)
+
+	env := os.Environ()
+	if q.maxLocalShards > 0 {
+		env = append(env, fmt.Sprintf("SNERD_MAX_SHARDS=%d", q.maxLocalShards))
+	}
+	if q.maxWorkers > 0 {
+		env = append(env, fmt.Sprintf("SNERD_MAX_WORKERS=%d", q.maxWorkers))
+	}
+	q.process.Env = env
 
 	stdin, err := q.process.StdinPipe()
 	if err != nil {
@@ -327,7 +345,7 @@ func (q *SnerdQueue) send(msg map[string]interface{}) {
 	q.stdin.Write(b) //nolint:errcheck // ignore write errors when daemon dies
 }
 
-func (q *SnerdQueue) Enqueue(taskID, taskType string, data interface{}, maxRetries int, retryAfterHours float64, rateLimitGroup string, maxPerMinute int, autoDedupe *bool, urgencyScore *float64, executeAt *string, cron *string, webhookUrl *string, maxExecutionSeconds *int, triggerAfterIds []string) error {
+func (q *SnerdQueue) Enqueue(taskID, taskType string, data interface{}, maxRetries int, retryAfterHours float64, rateLimitGroup string, maxPerMinute int, autoDedupe *bool, urgencyScore *float64, executeAt *string, cron *string, webhookUrl *string, maxExecutionSeconds *int, triggerAfterIds []string, pool *string) error {
 	q.shutdownMutex.RLock()
 	if q.process == nil || q.shuttingDown {
 		q.shutdownMutex.RUnlock()
@@ -379,6 +397,9 @@ func (q *SnerdQueue) Enqueue(taskID, taskType string, data interface{}, maxRetri
 	}
 	if triggerAfterIds != nil {
 		payload["trigger_after_ids"] = triggerAfterIds
+	}
+	if pool != nil {
+		payload["pool"] = *pool
 	}
 
 	ch := make(chan error, 1)
