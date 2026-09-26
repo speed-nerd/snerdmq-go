@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>🚀 SnerdMQ Go SDK (v1.0.9)</h1>
+  <h1>🚀 SnerdMQ Go SDK (v1.1.0)</h1>
   <p>A zero-config, persistent background job queue for Go microservices. The official Go client for the SnerdMQ Rust daemon.</p>
 
   [![Go Reference](https://pkg.go.dev/badge/github.com/speed-nerd/snerdmq-go.svg)](https://pkg.go.dev/github.com/speed-nerd/snerdmq-go)
@@ -9,6 +9,8 @@
 This is the official Go SDK wrapper for **SnerdMQ**. It handles all JSON-RPC communication and `os/exec` standard I/O orchestration so you can write lightning-fast background jobs in Go without blocking your application's main thread.
 
 ## ✨ Features
+- **Worker Pools**: Prevent slow generative AI tasks from starving fast DB tasks by dedicating goroutines to specific pools (e.g. `"urgent"`).
+- **Sharded Queues**: Distribute load across multiple queue nodes safely using file-backed lock sharding (`MaxLocalShards`).
 - **Ditch Redis**: The official SnerdMQ Go SDK gives your Goroutines persistent state, automatic retries, and dead-letter queues right out of the box.
 - **Progress Streaming & Live Dashboard**: Handlers can stream progress updates to a built-in React UI dashboard served by the SDK.
 - **Zero Rust Required**: Our CLI tool automatically downloads the pre-compiled C-speed Rust binary for your OS.
@@ -85,6 +87,8 @@ func main() {
 		nil,          // Cron
 		nil,          // Webhook URL
 		nil,          // Max Execution Seconds
+		nil,          // TriggerAfterIds
+		nil,          // Pool
 	)
 
 	// 5. Need scheduling, deduplication, or serverless execution? All
@@ -109,6 +113,8 @@ func main() {
 		&cronStr,      // Cron schedule
 		&webhookUrl,   // Execute via HTTP instead of local handlers
 		&maxExecutionSeconds,
+		[]string{"parent-123"}, // TriggerAfterIds: Wait for parent tasks to complete
+		"urgent",      // Pool: Dedicate to a specific worker pool
 	)
 
 	// 6. Wait for OS signals and shut down gracefully
@@ -121,7 +127,7 @@ func main() {
 }
 ```
 
-### ⚙️ Advanced Task Configuration (v1.0.9)
+### ⚙️ Advanced Task Configuration (v1.1.0)
 To power complex workflows, tasks can now be configured with advanced orchestration parameters via the `Enqueue` positional arguments:
 
 * **`AutoDedupe` (`bool`)**: If set to `true`, the daemon computes a cryptographic hash of the task type and data. If an identical payload is pending execution, this new task is silently dropped.
@@ -132,6 +138,8 @@ To power complex workflows, tasks can now be configured with advanced orchestrat
 * **`Cron` (`string`)**: A cron expression (e.g. `"0 * * * *"`) for recurring jobs. Shorthands like `"2h"` or `"10m"` are also supported.
 * **`WebhookUrl` (`string`)**: By providing a webhook URL, SnerdMQ will completely bypass your local Go handlers and dispatch the task payload via an HTTP POST request directly to the specified URL.
 * **`MaxExecutionSeconds` (`int`)**: Optional hard timeout in seconds. If execution takes longer, it's marked as failed via a context timeout.
+* **`TriggerAfterIds` (`[]string`)**: A list of parent task IDs that must complete successfully before this task is allowed to dispatch. Enables complex DAG workflows natively within the queue.
+* **`Pool` (`string`)**: Dedicate this task to a specific worker pool (e.g. `"urgent"`). Initialize pool sizes with `MaxWorkers` in the config.
 
 ### Note on Hard Timeouts (`MaxExecutionSeconds`)
 When `MaxExecutionSeconds` is provided, the Go SDK executes your handler with a `context.WithTimeout`. If the task takes longer than the timeout, the context is cancelled, and if your handler respects the context cancellation, it will terminate early and the task is marked as failed. In addition, the background Rust daemon will forcefully time out the IPC channel if it takes too long.
@@ -258,7 +266,13 @@ second, err := snerdmq.NewSnerdQueue() // ❌ daemon refuses to start:
 // "Another daemon is already running on storage '.snerdata'"
 ```
 
-This applies across processes too — in a multi-worker deployment, each worker must either use its own storage directory or talk to a single shared daemon.
+This applies across processes too — in a multi-worker deployment, each worker must either use its own storage directory or talk to a single shared daemon. To safely scale on the same disk without double-executing jobs, you must initialize the daemon with `MaxLocalShards`:
+```go
+queue, _ := snerdmq.NewSnerdQueue(snerdmq.SnerdQueueConfig{
+	MaxLocalShards: 4,
+	MaxWorkers: map[string]int{"urgent": 5},
+})
+```
 
 ### 🔀 Need multiple queues? Give each one its own storage
 
