@@ -344,7 +344,7 @@ queue.Enqueue(snerd.RetryableTask{
 ```
 
 
-*Built with ❤️ for John Wick tier engineering.*
+
 
 
 ## Architecture Best Practices
@@ -404,3 +404,40 @@ func main() {
 	queue.Shutdown()
 }
 ```
+### 🕒 Cron & Scheduled Jobs
+```go
+// Run every day at 08:00
+cronExpr := "0 8 * * *"
+queue.Enqueue(snerd.RetryableTask{
+    TaskId: "daily-digest",
+    TaskType: "send_email",
+    TaskData: map[string]interface{}{"template": "daily"},
+    Cron: &cronExpr,
+})
+```
+
+### 🛑 Hard Timeouts
+```go
+// Forcefully kill if running > 5 mins
+maxExec := 300
+queue.Enqueue(snerd.RetryableTask{
+    TaskId: "risky-task",
+    TaskType: "process_data",
+    TaskData: map[string]interface{}{},
+    MaxExecutionSeconds: &maxExec,
+})
+```
+
+### 🌐 Webhook Callbacks
+```go
+// Execute via HTTP instead of local handlers
+webhook := "https://api.example.com/webhooks/snerdmq"
+queue.Enqueue(snerd.RetryableTask{
+    TaskId: "serverless-task",
+    TaskType: "resize_image",
+    TaskData: map[string]interface{}{"img": "cat.jpg"},
+    WebhookUrl: &webhook,
+})
+```
+
+*Built with ❤️ for John Wick tier engineering.*
