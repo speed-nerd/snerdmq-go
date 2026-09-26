@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>🚀 SnerdMQ Go SDK (v1.1.0)</h1>
+  <h1>🚀 SnerdMQ Go SDK (v1.1.1)</h1>
   <p>A zero-config, persistent background job queue for Go microservices. The official Go client for the SnerdMQ Rust daemon.</p>
 
   [![Go Reference](https://pkg.go.dev/badge/github.com/speed-nerd/snerdmq-go.svg)](https://pkg.go.dev/github.com/speed-nerd/snerdmq-go)
@@ -127,7 +127,7 @@ func main() {
 }
 ```
 
-### ⚙️ Advanced Task Configuration (v1.1.0)
+### ⚙️ Advanced Task Configuration (v1.1.1)
 To power complex workflows, tasks can now be configured with advanced orchestration parameters via the `Enqueue` positional arguments:
 
 * **`AutoDedupe` (`bool`)**: If set to `true`, the daemon computes a cryptographic hash of the task type and data. If an identical payload is pending execution, this new task is silently dropped.
@@ -302,6 +302,29 @@ queue, _ := snerdmq.NewSnerdQueue(snerdmq.SnerdQueueConfig{
 ```
 
 A shared network drive (AWS EFS or NFS) is still a good home for that storage when a single instance needs durable state — e.g. a container that restarts but must keep its queue. Native OS file locking (`flock`) keeps writes safe — no Redis required.
+
+
+---
+
+## 🚀 Advanced Orchestration
+
+### 🏊 Worker Pools
+
+SnerdMQ supports dedicating worker resources to specific tasks so that slow AI generation tasks don't starve fast database updates.
+
+In the SDK, simply assign a pool name when enqueueing the task using the `pool` parameter. When running the daemon, you can allocate concurrent workers per pool using the environment variable:
+`SNERD_POOLS="default:100,urgent:50"`
+
+### 🔗 Job Chaining (DAGs)
+
+You can define complex workflow dependencies natively. Tasks will wait in a blocked state until their parent tasks successfully complete.
+
+Simply pass an array of parent task IDs to the `trigger_after_ids` parameter when enqueueing. This easily unlocks Fan-In and Linear workflows natively within the queue.
+
+### 🍕 Sharded Queues (Scaling Out)
+
+SnerdMQ natively supports distributed execution across multiple servers while acting as a single logical queue. Just mount a shared storage drive (like AWS EFS) and boot multiple daemons. They will automatically lock and negotiate ownership of shards. No config required in the SDK!
+
 
 *Built with ❤️ for John Wick tier engineering.*
 
