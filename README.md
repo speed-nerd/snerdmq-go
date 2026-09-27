@@ -322,129 +322,36 @@ Simply pass an array of parent task IDs to the `trigger_after_ids` parameter whe
 
 ### 🍕 Sharded Queues (Scaling Out)
 
-SnerdMQ natively supports distributed execution across multiple servers while acting as a single logical queue. Just mount a shared storage drive (like AWS EFS) and boot multiple daemons. They will automatically lock and negotiate ownership of shards. No config required in the SDK for enqueueing! Just tell the daemon how many shards to claim on boot:
-
-```go
-// Boot a multi-tenant daemon that owns up to 4 shards locally
-queue := snerd.NewQueue(snerd.QueueOptions{
-    MaxLocalShards: 4,
-})
-```
+SnerdMQ natively supports distributed execution across multiple servers while acting as a single logical queue. Just mount a shared storage drive (like AWS EFS) and boot multiple daemons. They will automatically lock and negotiate ownership of shards. No config required in the SDK for enqueueing! Just tell the daemon how many shards to claim on boot.
 
 ```go
 // 1. Worker Pools: Route tasks to the 'urgent' pool
-pool := "urgent"
-queue.Enqueue(snerd.RetryableTask{
-    TaskId: "payment-job",
-    TaskType: "process_payment",
-    TaskData: map[string]interface{}{"amount": 100},
-    Pool: &pool,
-})
+urgentPool := "urgent"
+queue.Enqueue("payment-job", "process_payment", map[string]interface{}{"amount": 100}, 3, 0.0, "", 0, nil, nil, nil, nil, nil, nil, &urgentPool, nil)
 
 // 2. Job Chaining: Block execution until parents succeed
-queue.Enqueue(snerd.RetryableTask{
-    TaskId: "final-job",
-    TaskType: "send_report",
-    TaskData: map[string]interface{}{"id": 1},
-    TriggerAfterIds: []string{"parent-job-1", "parent-job-2"},
-})
+queue.Enqueue("final-job", "send_report", map[string]interface{}{"id": 1}, 3, 0.0, "", 0, nil, nil, nil, nil, nil, nil, nil, []string{"parent-job-1", "parent-job-2"})
 ```
 
-
-
-
-
-## Architecture Best Practices
-
-When building production applications with SnerdMQ, it is recommended to initialize the queue as a Singleton, isolate your domain workers into separate files/functions, use Dead Letter Queues (DLQ) for failed tasks via `RegisterMaxRetryHandler`, and ensure manual graceful shutdown. The embedded Dashboard UI can also be easily served from the same instance.
-
-```go
-package main
-
-import (
-	"context"
-	"log"
-	"os"
-	"os/signal"
-	"syscall"
-	snerdmq "github.com/speed-nerd/snerdmq-go"
-)
-
-var queue *snerdmq.SnerdQueue
-
-func initEmailWorkers() {
-	queue.RegisterHandler("send_email", func(ctx context.Context, data map[string]interface{}) error {
-		log.Printf("Sending email to %s...", data["email"])
-		return nil
-	})
-	queue.RegisterMaxRetryHandler("send_email", func(ctx context.Context, data map[string]interface{}) error {
-		log.Printf("Email to %s failed permanently. Dead letter processing...", data["email"])
-		return nil
-	})
-}
-
-func initImageWorkers() {
-	queue.RegisterHandler("process_image", func(ctx context.Context, data map[string]interface{}) error {
-		log.Printf("Processing image %s...", data["imageId"])
-		return nil
-	})
-}
-
-func main() {
-	queue = snerdmq.NewSnerdQueue(snerdmq.SnerdQueueOptions{ StoragePath: "./.snerdata" })
-	
-	initEmailWorkers()
-	initImageWorkers()
-
-	queue.StartDashboard(8080)
-	
-	if err := queue.StartListening(); err != nil {
-		log.Fatalf("Failed to start daemon: %v", err)
-	}
-
-	// Wait for termination signal
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-	<-sigChan
-
-	// Manually shut down the queue safely
-	queue.Shutdown()
-}
-```
 ### 🕒 Cron & Scheduled Jobs
 ```go
 // Run every day at 08:00
 cronExpr := "0 8 * * *"
-queue.Enqueue(snerd.RetryableTask{
-    TaskId: "daily-digest",
-    TaskType: "send_email",
-    TaskData: map[string]interface{}{"template": "daily"},
-    Cron: &cronExpr,
-})
+queue.Enqueue("daily-digest", "send_email", map[string]interface{}{"template": "daily"}, 3, 0.0, "", 0, nil, nil, nil, &cronExpr, nil, nil, nil, nil)
 ```
 
 ### 🛑 Hard Timeouts
 ```go
 // Forcefully kill if running > 5 mins
 maxExec := 300
-queue.Enqueue(snerd.RetryableTask{
-    TaskId: "risky-task",
-    TaskType: "process_data",
-    TaskData: map[string]interface{}{},
-    MaxExecutionSeconds: &maxExec,
-})
+queue.Enqueue("risky-task", "process_data", map[string]interface{}{}, 3, 0.0, "", 0, nil, nil, nil, nil, nil, &maxExec, nil, nil)
 ```
 
 ### 🌐 Webhook Callbacks
 ```go
 // Execute via HTTP instead of local handlers
 webhook := "https://api.example.com/webhooks/snerdmq"
-queue.Enqueue(snerd.RetryableTask{
-    TaskId: "serverless-task",
-    TaskType: "resize_image",
-    TaskData: map[string]interface{}{"img": "cat.jpg"},
-    WebhookUrl: &webhook,
-})
+queue.Enqueue("serverless-task", "resize_image", map[string]interface{}{"img": "cat.jpg"}, 3, 0.0, "", 0, nil, nil, nil, nil, &webhook, nil, nil, nil)
 ```
 
 *Built with ❤️ for John Wick tier engineering.*
